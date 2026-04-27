@@ -27,41 +27,34 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
-      - name: Locate project directory
-        id: locate
-        shell: pwsh
+      - name: Detect project directory
+        shell: bash
         run: |
-          $sln = git ls-files '*.sln' | Select-Object -First 1
-          $csproj = git ls-files '*.csproj' | Select-Object -First 1
-          if ($sln) {
-            $projPath = Split-Path $sln -Parent
-          } elseif ($csproj) {
-            $projPath = Split-Path $csproj -Parent
-          } else {
-            $projPath = '.'
-          }
-          Write-Host "PROJECT_DIR=$projPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-          Write-Host "Found project directory: $projPath"
+          # Find a solution or project file in the repo
+          proj=$(git ls-files '*.sln' | head -n 1)
+          if [ -z "$proj" ]; then
+            proj=$(git ls-files '*.csproj' | head -n 1)
+          fi
+
+          if [ -n "$proj" ]; then
+            projdir=$(dirname "$proj")
+            echo "Found project file: $proj"
+            echo "PROJECT_DIR=$projdir" >> $GITHUB_ENV
+          else
+            # No project/solution found — set PROJECT_DIR to repo root but fail early with a clear message
+            echo "PROJECT_DIR=." >> $GITHUB_ENV
+            echo "ERROR: No .sln or .csproj found in the repository. If your project is in a subfolder, either move it to the repo root or update the workflow to point to the correct path." >&2
+            exit 1
+          fi
 
       - name: Restore dependencies
-        shell: pwsh
-        run: |
-          if ($env:PROJECT_DIR -ne '.') { Set-Location $env:PROJECT_DIR }
-          dotnet restore
+        run: dotnet restore
+        working-directory: ${{ env.PROJECT_DIR }}
 
       - name: Build and publish
-        shell: pwsh
         run: |
-          if ($env:PROJECT_DIR -ne '.') { Set-Location $env:PROJECT_DIR }
           dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=false -p:PublishTrimmed=false
-          # Ensure publish folder exists
-          $publish = Get-ChildItem -Path . -Recurse -Directory -Filter publish -ErrorAction SilentlyContinue | Select-Object -First 1
-          if (-not $publish) {
-            Write-Host "No publish folder found under project; listing bin/Release..."
-            Get-ChildItem -Path bin -Recurse -Force
-          } else {
-            Write-Host "Publish folder: $($publish.FullName)"
-          }
+        working-directory: ${{ env.PROJECT_DIR }}
 
       - name: Upload EXE artifact
         uses: actions/upload-artifact@v4
