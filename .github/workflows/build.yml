@@ -16,25 +16,57 @@ permissions:
 jobs:
   build:
     runs-on: windows-latest
+    timeout-minutes: 60
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup .NET
+      - name: Setup .NET SDK
         uses: actions/setup-dotnet@v3
         with:
           dotnet-version: '8.0.x'
 
-      - name: Restore dependencies
-        run: dotnet restore
+      - name: Locate project directory
+        id: locate
+        shell: pwsh
+        run: |
+          $sln = git ls-files '*.sln' | Select-Object -First 1
+          $csproj = git ls-files '*.csproj' | Select-Object -First 1
+          if ($sln) {
+            $projPath = Split-Path $sln -Parent
+          } elseif ($csproj) {
+            $projPath = Split-Path $csproj -Parent
+          } else {
+            $projPath = '.'
+          }
+          Write-Host "PROJECT_DIR=$projPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          Write-Host "Found project directory: $projPath"
 
-      - name: Build project
-        run: dotnet publish -c Release -r win-x64 --self-contained true
+      - name: Restore dependencies
+        shell: pwsh
+        run: |
+          if ($env:PROJECT_DIR -ne '.') { Set-Location $env:PROJECT_DIR }
+          dotnet restore
+
+      - name: Build and publish
+        shell: pwsh
+        run: |
+          if ($env:PROJECT_DIR -ne '.') { Set-Location $env:PROJECT_DIR }
+          dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=false -p:PublishTrimmed=false
+          # Ensure publish folder exists
+          $publish = Get-ChildItem -Path . -Recurse -Directory -Filter publish -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $publish) {
+            Write-Host "No publish folder found under project; listing bin/Release..."
+            Get-ChildItem -Path bin -Recurse -Force
+          } else {
+            Write-Host "Publish folder: $($publish.FullName)"
+          }
 
       - name: Upload EXE artifact
         uses: actions/upload-artifact@v4
         with:
           name: JJS-Autoplayer-${{ github.run_id }}
           path: |
+            **/bin/Release/**/publish/**
             **/publish/**
