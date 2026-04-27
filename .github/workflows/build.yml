@@ -40,11 +40,11 @@ jobs:
             echo "PROJECT_DIR=$projdir" >> $GITHUB_ENV
           else
             echo "PROJECT_DIR=." >> $GITHUB_ENV
-            echo "ERROR: No .sln or .csproj found in the repository. If your project is in a subfolder, move it to the repo root or add a .sln/.csproj to the repo." >&2
+            echo "ERROR: No .sln or .csproj found in the repository. If your project is in a subfolder, set PROJECT_DIR manually or move the project to the repo root." >&2
             exit 1
           fi
 
-      - name: Verify Windows Forms configuration (fail with clear guidance)
+      - name: Verify Windows Forms configuration
         shell: bash
         run: |
           csproj=$(git ls-files "${PROJECT_DIR}/*.csproj" | head -n 1)
@@ -52,15 +52,13 @@ jobs:
             echo "No .csproj found in PROJECT_DIR; skipping WinForms check."
             exit 0
           fi
-          # Check for net*-windows or UseWindowsForms
           if grep -qE "<TargetFramework>.*-windows" "$csproj" || grep -q "<UseWindowsForms>true</UseWindowsForms>" "$csproj"; then
             echo "Project appears configured for Windows/WinForms."
             exit 0
           fi
-          echo "ERROR: Project may be missing Windows target or UseWindowsForms. To build WinForms apps, update the .csproj:"
-          echo "  <TargetFramework>net8.0-windows</TargetFramework>"
-          echo "  <UseWindowsForms>true</UseWindowsForms>"
-          echo "Or add 'using System;' to generated Designer files as a temporary workaround." >&2
+          echo "ERROR: Project may be missing Windows target or UseWindowsForms. To build WinForms apps, update the .csproj:" >&2
+          echo "  <TargetFramework>net8.0-windows</TargetFramework>" >&2
+          echo "  <UseWindowsForms>true</UseWindowsForms>" >&2
           exit 1
 
       - name: Restore dependencies
