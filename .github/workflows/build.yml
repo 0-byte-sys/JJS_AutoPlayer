@@ -30,20 +30,17 @@ jobs:
       - name: Detect project directory
         shell: bash
         run: |
-          # Find a solution or project file in the repo
           proj=$(git ls-files '*.sln' | head -n 1)
           if [ -z "$proj" ]; then
             proj=$(git ls-files '*.csproj' | head -n 1)
           fi
-
           if [ -n "$proj" ]; then
             projdir=$(dirname "$proj")
             echo "Found project file: $proj"
             echo "PROJECT_DIR=$projdir" >> $GITHUB_ENV
           else
-            # No project/solution found — set PROJECT_DIR to repo root but fail early with a clear message
             echo "PROJECT_DIR=." >> $GITHUB_ENV
-            echo "ERROR: No .sln or .csproj found in the repository. If your project is in a subfolder, either move it to the repo root or update the workflow to point to the correct path." >&2
+            echo "ERROR: No .sln or .csproj found in the repository. If your project is in a subfolder, set PROJECT_DIR manually or move the project to the repo root." >&2
             exit 1
           fi
 
