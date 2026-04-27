@@ -52,28 +52,4 @@ jobs:
             echo "No .csproj found in PROJECT_DIR; skipping WinForms check."
             exit 0
           fi
-          if grep -qE "<TargetFramework>.*-windows" "$csproj" || grep -q "<UseWindowsForms>true</UseWindowsForms>" "$csproj"; then
-            echo "Project appears configured for Windows/WinForms."
-            exit 0
-          fi
-          echo "ERROR: Project may be missing Windows target or UseWindowsForms. To build WinForms apps, update the .csproj:" >&2
-          echo "  <TargetFramework>net8.0-windows</TargetFramework>" >&2
-          echo "  <UseWindowsForms>true</UseWindowsForms>" >&2
-          exit 1
-
-      - name: Restore dependencies
-        run: dotnet restore
-        working-directory: ${{ env.PROJECT_DIR }}
-
-      - name: Build and publish
-        run: |
-          dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=false -p:PublishTrimmed=false
-        working-directory: ${{ env.PROJECT_DIR }}
-
-      - name: Upload EXE artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: JJS-Autoplayer-${{ github.run_id }}
-          path: |
-            **/bin/Release/**/publish/**
-            **/publish/**
+          if grep -qE "<TargetFramework>.*-windows" "$csproj" || grep -q "<UseWindowsForms>true</UseWindowsForms>
