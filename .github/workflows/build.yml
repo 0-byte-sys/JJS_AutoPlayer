@@ -27,29 +27,57 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
-      - name: Detect project file and set PROJECT_DIR
-        shell: bash
+      - name: Detect project directory (PowerShell)
+        id: detect
+        shell: pwsh
         run: |
-          proj=$(git ls-files '*.sln' | head -n 1)
-          if [ -z "$proj" ]; then
-            proj=$(git ls-files '*.csproj' | head -n 1)
-          fi
-          if [ -n "$proj" ]; then
-            projdir=$(dirname "$proj")
-            echo "Found project file: $proj"
-            echo "PROJECT_DIR=$projdir" >> $GITHUB_ENV
-          else
-            echo "PROJECT_DIR=." >> $GITHUB_ENV
-            echo "ERROR: No .sln or .csproj found in the repository. If your project is in a subfolder, set PROJECT_DIR manually or move the project to the repo root." >&2
-            exit 1
-          fi
+          $sln = git ls-files '*.sln' | Select-Object -First 1
+          $csproj = git ls-files '*.csproj' | Select-Object -First 1
+          if ($sln) {
+            $projPath = Split-Path $sln -Parent
+          } elseif ($csproj) {
+            $projPath = Split-Path $csproj -Parent
+          } else {
+            $projPath = '.'
+          }
+          Write-Host "PROJECT_DIR=$projPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          Write-Host "Detected project directory: $projPath"
 
-      - name: Verify Windows Forms configuration
-        shell: bash
+      - name: Verify WinForms configuration (PowerShell)
+        shell: pwsh
         run: |
-          csproj=$(git ls-files "${PROJECT_DIR}/*.csproj" | head -n 1)
-          if [ -z "$csproj" ]; then
-            echo "No .csproj found in PROJECT_DIR; skipping WinForms check."
+          $csproj = git ls-files "$env:PROJECT_DIR\*.csproj" | Select-Object -First 1
+          if (-not $csproj) {
+            Write-Host "No .csproj found in PROJECT_DIR; skipping WinForms check."
             exit 0
-          fi
-          if grep -qE "<TargetFramework>.*-windows" "$csproj" || grep -q "<UseWindowsForms>true</UseWindowsForms>
+          }
+          $content = Get-Content $csproj -Raw
+          if ($content -match '<TargetFramework>.*-windows' -or $content -match '<UseWindowsForms>\s*true\s*</UseWindowsForms>') {
+            Write-Host "Project appears configured for Windows/WinForms."
+            exit 0
+          }
+          Write-Error "Project may be missing a Windows target or UseWindowsForms. Edit the .csproj to include:
+  <TargetFramework>net8.0-windows</TargetFramework>
+  <UseWindowsForms>true</UseWindowsForms>
+Or add 'using System;' to generated Designer files as a temporary workaround."
+          exit 1
+
+      - name: Restore dependencies
+        shell: pwsh
+        run: |
+          dotnet restore
+        working-directory: ${{ env.PROJECT_DIR }}
+
+      - name: Build and publish
+        shell: pwsh
+        run: |
+          dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=false -p:PublishTrimmed=false
+        working-directory: ${{ env.PROJECT_DIR }}
+
+      - name: Upload EXE artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: JJS-Autoplayer-${{ github.run_id }}
+          path: |
+            **/bin/Release/**/publish/**
+            **/publish/**
