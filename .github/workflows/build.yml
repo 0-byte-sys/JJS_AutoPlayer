@@ -11,12 +11,11 @@ concurrency:
 
 permissions:
   contents: read
-  actions: read
 
 jobs:
   build:
-    runs-on: windows-latest
-    timeout-minutes: 60
+    runs-on: windows-2022
+    timeout-minutes: 30
 
     steps:
       - name: Checkout repository
@@ -25,56 +24,23 @@ jobs:
       - name: Setup .NET SDK
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '8.0.x'
+          dotnet-version: "8.0.x"
 
-      - name: Detect project directory (PowerShell)
-        id: detect
-        shell: pwsh
-        run: |
-          $sln = git ls-files '*.sln' | Select-Object -First 1
-          $csproj = git ls-files '*.csproj' | Select-Object -First 1
-          if ($sln) {
-            $projPath = Split-Path $sln -Parent
-          } elseif ($csproj) {
-            $projPath = Split-Path $csproj -Parent
-          } else {
-            $projPath = '.'
-          }
-          Write-Host "PROJECT_DIR=$projPath" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-          Write-Host "Detected project directory: $projPath"
+      - name: Restore
+        run: dotnet restore JJSAutoplayer/JJsAutoplayer.csproj
 
-      - name: Verify WinForms configuration (PowerShell)
-        shell: pwsh
-        run: |
-          $csproj = git ls-files "$env:PROJECT_DIR\*.csproj" | Select-Object -First 1
-          if (-not $csproj) {
-            Write-Host "No .csproj found in PROJECT_DIR; skipping WinForms check."
-            exit 0
-          }
-          $content = Get-Content $csproj -Raw
-          if ($content -match '<TargetFramework>.*-windows' -or $content -match '<UseWindowsForms>\s*true\s*</UseWindowsForms>') {
-            Write-Host "Project appears configured for Windows/WinForms."
-            exit 0
-          }
-          Write-Error "Project may be missing a Windows target or UseWindowsForms. Check the .csproj for TargetFramework net8.0-windows and UseWindowsForms true."
-          exit 1
-
-      - name: Restore dependencies
-        shell: pwsh
-        run: |
-          dotnet restore
-        working-directory: ${{ env.PROJECT_DIR }}
-
-      - name: Build and publish
-        shell: pwsh
-        run: |
-          dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=false -p:PublishTrimmed=false
-        working-directory: ${{ env.PROJECT_DIR }}
+      - name: Publish Windows build
+        run: >
+          dotnet publish JJSAutoplayer/JJsAutoplayer.csproj
+          -c Release
+          -r win-x64
+          --self-contained true
+          -p:PublishSingleFile=false
+          -p:PublishTrimmed=false
+          -o publish/JJS-AutoPlayer
 
       - name: Upload EXE artifact
         uses: actions/upload-artifact@v4
         with:
-          name: JJS-Autoplayer-${{ github.run_id }}
-          path: |
-            **/bin/Release/**/publish/**
-            **/publish/**
+          name: JJS-AutoPlayer-${{ github.run_number }}
+          path: publish/JJS-AutoPlayer/**
