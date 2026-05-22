@@ -1,0 +1,12 @@
+# Advanced mode chord test. Brackets press multiple keys.
+[ZXC] 350
+- 100
+[ASD] 350
+- 100
+[QWE] 350
+- 100
+[WER] 350
+- 100
+[DSA] 220
+[CXZ] 220
+[QAZ] 350

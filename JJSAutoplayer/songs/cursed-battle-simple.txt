@@ -1,0 +1,24 @@
+# Simple mode practice loop. Format: KEY delayMs
+Z 180
+X 180
+C 180
+V 180
+B 240
+- 120
+A 180
+S 180
+D 180
+F 180
+G 240
+- 120
+Q 160
+W 160
+E 160
+R 160
+T 260
+- 160
+G 120
+F 120
+D 120
+S 120
+A 260
